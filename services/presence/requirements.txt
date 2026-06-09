@@ -1,0 +1,4 @@
+fastapi==0.111.0
+uvicorn==0.29.0
+paho-mqtt==2.1.0
+falkordb==1.6.1

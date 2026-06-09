@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoOps AI — Demo Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      font-size: 13px;
+      --navy: #0D1F3C;
+      --navy-mid: #1B3A5C;
+      --blue: #2E6DA4;
+      --blue-lt: #4A90D9;
+      --ice: #C8DFFE;
+      --teal: #0A8F80;
+      --teal-lt: #0FB39F;
+      --amber: #E8A020;
+      --red: #C0392B;
+      --red-lt: #E74C3C;
+      --green: #27AE60;
+      --slate: #8BA4BE;
+      --white: #F0F4FA;
+      --card: #122844;
+      --border: #1E4070;
+      --mono: 'DM Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--navy);
+      color: var(--white);
+      font-family: var(--sans);
+      font-size: 1.3rem;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      background: var(--navy-mid);
+      border-bottom: 2px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 16px; }
+    .logo { font-size: 1.6rem; font-weight: 800; letter-spacing: 0.5px; color: var(--white); }
+    .logo span { color: var(--teal-lt); }
+    .badge-poc {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--sans); font-size: 1.2rem; font-weight: 600;
+      color: #30ec0a;
+      padding: 4px 10px; border-radius: 6px;
+      background: rgba(15,179,159,0.08);
+      border: 1px solid rgba(17,197,17,0.3);
+      box-shadow: 0 0 6px rgba(15,179,159,0.25);
+    }
+    .badge-poc:hover { box-shadow: 0 0 10px rgba(15,179,159,0.5); transform: translateY(-1px); }
+    .kai-icon { font-size: 0.9rem; color: #29c70a; }
+
+    .platform-box {
+      background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+      padding: 10px 12px; margin-bottom: 10px;
+      display: flex; align-items: center; justify-content: flex-start;
+      font-size: 1.1rem;
+    }
+    .platform-status { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 1.1rem; font-weight: 600; letter-spacing: 1px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+    .status-dot.degraded { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+    .status-dot.incident { background: var(--red-lt); box-shadow: 0 0 8px var(--red-lt); }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.5} }
+
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .auto-refresh { font-family: var(--mono); font-size: 1.0rem; color: var(--slate); display: flex; align-items: center; gap: 6px; }
+    .toggle { width: 32px; height: 16px; background: var(--border); border-radius: 8px; cursor: pointer; position: relative; transition: background 0.2s; }
+    .toggle.on { background: var(--teal); }
+    .toggle::after { content:''; position:absolute; top:2px; left:2px; width:12px; height:12px; background:var(--white); border-radius:50%; transition:transform 0.2s; }
+    .toggle.on::after { transform: translateX(16px); }
+    .last-updated { font-family: var(--mono); font-size: 1.0rem; color: var(--slate); }
+
+    /* ── LAYOUT ── */
+    .layout { display: grid; grid-template-columns: 320px 1fr 320px; grid-template-rows: auto 1fr; height: calc(100vh - 52px); overflow: hidden; }
+    .panel { min-height: 0; border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; }
+    .panel:last-child { border-right: none; }
+    .panel-title { font-size: 0.8rem; font-weight: 600; letter-spacing: 3px; color: var(--blue-lt); text-transform: uppercase; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    /* ── SERVICE CARDS ── */
+    .service-card { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; transition: border-color 0.3s; }
+    .service-card.healthy { border-left-color: var(--green); }
+    .service-card.unhealthy { border-left-color: var(--red-lt); }
+    .service-card.unreachable { border-left-color: var(--amber); opacity: 0.7; }
+    .service-header { display: flex; justify-content: space-between; align-items: center; }
+    .service-name { font-family: var(--mono); font-size: 1.1rem; font-weight: 600; color: var(--white); }
+    .service-status { font-family: var(--mono); font-size: 0.9rem; font-weight: 700; letter-spacing: 1px; padding: 2px 6px; border-radius: 2px; }
+    .status-healthy { background: rgba(39,174,96,0.2); color: var(--green); }
+    .status-unhealthy { background: rgba(192,57,43,0.2); color: var(--red-lt); }
+    .status-unreachable { background: rgba(232,160,32,0.2); color: var(--amber); }
+    .service-issue { font-size: 1.0rem; color: var(--slate); margin-top: 4px; font-family: var(--mono); }
+    .fault-flags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+    .fault-flag { font-family: var(--mono); font-size: 0.8rem; font-weight: 600; padding: 1px 5px; border-radius: 2px; background: rgba(232,160,32,0.15); color: var(--amber); border: 1px solid rgba(232,160,32,0.3); }
+    .fault-flag.active { background: rgba(231,76,60,0.2); color: var(--red-lt); border-color: rgba(231,76,60,0.4); }
+
+    /* ── KPI CARDS ── */
+    .kpi-box { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 0; margin-bottom: 10px; }
+    .kpi-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .kpi-card:last-child { border-bottom: none; }
+    .kpi-body { flex: 1; }
+    .kpi-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 2px; color: var(--slate); text-transform: uppercase; margin-bottom: 5px; }
+    .kpi-values { display: grid; grid-template-columns: 110px 1fr; align-items: baseline; font-family: var(--mono); font-size: 1.1rem; }
+    .kpi-val-group { display: flex; align-items: baseline; gap: 5px; }
+    .kpi-num { font-size: 1.3rem; font-weight: 700; line-height: 1; }
+    .kpi-text { font-size: 0.95rem; color: var(--slate); }
+    .kpi-green { color: var(--green); }
+    .kpi-red { color: var(--red-lt); }
+    .kpi-amber { color: var(--amber); }
+
+    /* ── RCA ── */
+    .rca-box { background: rgba(231,76,60,0.08); border: 1px solid rgba(231,76,60,0.3); border-radius: 4px; padding: 10px 12px; margin-top: 10px; }
+    .rca-candidate { font-family: var(--mono); font-size: 1.0rem; color: var(--red-lt); padding: 3px 0; border-bottom: 1px solid rgba(231,76,60,0.15); }
+    .rca-candidate:last-child { border-bottom: none; }
+
+    /* ── CENTER PANEL ── */
+    .center-panel { display: grid; grid-template-rows: auto 1fr; overflow: hidden; border-right: 1px solid var(--border); min-height: 0; }
+    .uc-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--navy-mid); }
+    .uc-tab { flex: 1; padding: 12px 8px; text-align: center; font-size: 0.9rem; font-weight: 700; letter-spacing: 0.5px; color: var(--slate); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; border-right: 1px solid var(--border); }
+    .uc-tab:last-child { border-right: none; }
+    .uc-tab.active { color: var(--white); border-bottom-color: var(--teal-lt); background: rgba(15,179,159,0.05); }
+    .uc-tab .uc-num { font-size: 1.4rem; font-weight: 600; display: block; margin-bottom: 2px; }
+    .uc-tab.uc1.active .uc-num { color: var(--teal-lt); }
+    .uc-tab.uc2.active .uc-num { color: var(--blue-lt); }
+    .uc-tab.uc3.active .uc-num { color: #A78BFA; }
+    .uc-content { overflow-y: auto; padding: 20px; min-height: 0; }
+    .uc-panel { display: none; }
+    .uc-panel.active { display: block; }
+    .uc-title { font-size: 1.5rem; font-weight: 600; letter-spacing: 0.3px; color: var(--white); margin-bottom: 4px; }
+    .uc-desc { font-size: 1.1rem; color: #AFC6E0; font-weight: 400; margin-bottom: 20px; line-height: 1.6; }
+    .step-section { margin-bottom: 18px; padding: 12px; border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; background: rgba(255,255,255,0.02); }
+    .step-label { font-size: 0.85rem; letter-spacing: 2px; color: var(--blue-lt); margin-bottom: 6px; }
+
+    /* ── BUTTONS ── */
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .btn { font-family: var(--sans); font-size: 1.1rem; font-weight: 700; padding: 8px 14px; border: 1px solid; border-radius: 3px; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0.3px; background: transparent; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--teal); color: white; border-color: var(--teal); }
+    .btn-primary:hover { background: var(--teal-lt); }
+    .btn-danger { background: rgba(231,76,60,0.15); border-color: var(--red); color: var(--red-lt); }
+    .btn-danger:hover:not(:disabled) { background: rgba(192,57,43,0.15); }
+    .btn-warn { border-color: var(--amber); color: var(--amber); }
+    .btn-warn:hover:not(:disabled) { background: rgba(232,160,32,0.12); }
+    .btn-blue { border-color: var(--blue); color: var(--blue-lt); }
+    .btn-blue:hover:not(:disabled) { background: rgba(46,109,164,0.15); }
+    .btn-ghost { border-color: var(--border); color: var(--slate); opacity: 0.7; }
+    .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.05); }
+    .btn-rca { background: linear-gradient(135deg, #0FB39F, #4A90D9); color: white; border: none; box-shadow: 0 0 10px rgba(15,179,159,0.4); }
+    .btn-rca:hover { transform: scale(1.03); }
+    .reset-btn { background: transparent; color: var(--slate); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; font-weight: 600; transition: all 0.2s ease; }
+    .reset-btn:hover { background: rgba(255,255,255,0.08); color: var(--white); border-color: var(--slate); }
+
+    /* ── RCA CARD ── */
+    .rca-card { background: rgba(15,179,159,0.05); border: 1px solid rgba(15,179,159,0.25); border-radius: 6px; padding: 12px; }
+    .rca-header { display: flex; align-items: center; gap: 10px; }
+    .rca-title { margin-right: 6px; font-family: var(--mono); font-size: 1.1rem; font-weight: 700; color: var(--white); }
+    .rca-status { margin-top: 6px; font-family: var(--mono); font-size: 1.0rem; color: var(--green); }
+
+    /* ── STEP FEEDBACK ── */
+    .step-feedback-area { margin-top: 8px; }
+
+    /* Step items with transition support for fade-out */
+    .step-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 10px; margin-top: 5px;
+      border-radius: 3px; border: 1px solid var(--border);
+      font-family: var(--mono); font-size: 1.0rem;
+      color: var(--slate); background: transparent;
+
+      /* Smooth entry */
+      transition: opacity 0.5s ease, max-height 0.4s ease, padding 0.4s ease,
+                  margin 0.4s ease, border-color 0.2s;
+      overflow: hidden;
+      max-height: 60px;
+      opacity: 1;
+    }
+
+    /* Collapse-out state triggered by JS */
+    .step-item.step-dismissing {
+      opacity: 0;
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      margin-top: 0;
+      border-color: transparent;
+    }
+
+    .step-item.step-running { border-color: var(--blue); color: var(--blue-lt); background: rgba(46,109,164,0.1); }
+    .step-item.step-done   { border-color: var(--teal); color: var(--teal-lt); background: rgba(10,143,128,0.08); }
+    .step-item.step-error  { border-color: var(--red);  color: var(--red-lt);  background: rgba(192,57,43,0.1); }
+    .step-item.step-skip   { border-color: var(--border); color: var(--slate); opacity: 0.4; }
+    .step-icon { width: 16px; flex-shrink: 0; text-align: center; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { display: inline-block; animation: spin 0.6s linear infinite; }
+
+    /* ── LOGS ── */
+    .log-selector { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; }
+    .log-select { flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--white); padding: 5px 8px; border-radius: 3px; font-family: var(--mono); font-size: 1.0rem; }
+    .log-viewer { background: #080F1A; border: 1px solid var(--border); border-radius: 4px; padding: 10px; height: calc(100% - 100px); overflow-y: auto; font-family: var(--mono); font-size: 1.0rem; line-height: 1.7; }
+    .log-line { padding: 1px 0; border-bottom: 1px solid rgba(30,64,112,0.3); }
+    .log-line.error { color: var(--red-lt); }
+    .log-line.warning { color: var(--amber); }
+    .log-line.info { color: #6B8CAE; }
+    .log-line.normal { color: #4A6A8A; }
+    .log-count { font-family: var(--mono); font-size: 0.9rem; color: var(--slate); margin-bottom: 6px; display: flex; gap: 12px; }
+    .log-count .err-count { color: var(--red-lt); }
+    .log-count .warn-count { color: var(--amber); }
+
+    /* ── MISC ── */
+    .divider { height: 1px; background: var(--border); margin: 14px 0; }
+    .section-header { font-size: 0.9rem; font-weight: 700; letter-spacing: 2px; color: var(--blue-lt); text-transform: uppercase; margin-bottom: 8px; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── INFO POPUP ── */
+    .info-popup-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9998; backdrop-filter: blur(2px); }
+    .info-popup img { width: 100%; height: auto; border-radius: 8px; display: block; }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+  <div class="info-popup-overlay" id="popupOverlay" onclick="closeAllPopups()"></div>
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo">AutoOps <span>AI</span></div>
+      <div class="badge-poc">
+        <span class="kai-icon">✦</span>
+        Powered by KAI
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost reset-btn" onclick="clearAll()">Reset System</button>
+      <div>
+        <img src="/images/kpit_logo.png" style="width:80px;height:auto;padding-top:7px;" />
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <div class="layout">
+
+    <!-- LEFT PANEL -->
+    <div class="panel" id="leftPanel">
+      <div class="panel-title">Platform Status</div>
+      <div class="platform-status platform-box">
+        <div class="status-dot" id="platformDot"></div>
+        <span id="platformText">CHECKING...</span>
+      </div>
+
+      <div class="panel-title">Platform KPIs</div>
+      <div class="kpi-box">
+        <div class="kpi-card">
+          <div class="kpi-body">
+            <div class="kpi-title">Services</div>
+            <div class="kpi-values">
+              <div class="kpi-val-group">
+                <span class="kpi-num kpi-green" id="svcHealthy">0</span>
+                <span class="kpi-text">Healthy</span>
+              </div>
+              <div class="kpi-val-group" style="margin-left:24px">
+                <span class="kpi-num kpi-red" id="svcUnhealthy">0</span>
+                <span class="kpi-text">Unhealthy</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-body">
+            <div class="kpi-title">Vehicles</div>
+            <div class="kpi-values">
+              <div class="kpi-val-group">
+                <span class="kpi-num kpi-green" id="vehConnected">0</span>
+                <span class="kpi-text">Connected</span>
+              </div>
+              <div class="kpi-val-group" style="margin-left:24px">
+                <span class="kpi-num kpi-red" id="vehDisconnected">0</span>
+                <span class="kpi-text">Disconnected</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-body">
+            <div class="kpi-title">Jira Tickets</div>
+            <div class="kpi-values">
+              <div class="kpi-val-group">
+                <span class="kpi-num kpi-amber" id="jiraOpen">0</span>
+                <span class="kpi-text">Closed</span>
+              </div>
+              <div class="kpi-val-group" style="margin-left:24px">
+                <span class="kpi-num kpi-red" id="jiraCritical">0</span>
+                <span class="kpi-text">Open</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-title">Service Health</div>
+      <div id="serviceCards">
+        <div style="color:var(--slate);font-size:1.1rem;font-family:var(--mono)">Loading...</div>
+      </div>
+    </div>
+
+    <!-- CENTER PANEL -->
+    <div class="center-panel">
+      <div class="uc-tabs">
+        <div class="uc-tab uc1 active" onclick="switchTab(1)">
+          <span class="uc-num">SCENARIO-1</span>Mass Alert Triage
+        </div>
+        <div class="uc-tab uc2" onclick="switchTab(2)">
+          <span class="uc-num">SCENARIO-2</span>Log Analysis
+        </div>
+        <div class="uc-tab uc3" onclick="switchTab(3)">
+          <span class="uc-num">SCENARIO-3</span>Operations History
+        </div>
+      </div>
+
+      <div class="uc-content">
+
+        <!-- ══ SCENARIO 1 ══ -->
+        <div class="uc-panel active" id="uc1">
+          <span class="uc-title">Mass Disconnect Triage</span>
+          <div style="position:relative;display:inline-block;">
+            <i class="fa-solid fa-circle-info info-icon" data-target="pop-1" style="font-size:15px;cursor:pointer;"></i>
+            <div id="pop-1" class="info-popup" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0D1F3C;border:2px solid #4A90D9;border-radius:12px;padding:16px;width:min(700px,90vw);max-height:85vh;z-index:9999;overflow:auto;box-shadow:0 0 40px rgba(0,0,0,0.8);">
+              <img class="zoomable" src="/images/1.png" style="width:100%;height:auto;border-radius:8px;" />
+            </div>
+          </div>
+          <div class="uc-desc">
+            Agent distinguishes a platform failure from an external network event using the dependency graph.
+          </div>
+
+          <div class="rca-card" style="margin-bottom:14px;">
+            <div class="rca-header">
+              <span class="rca-title">RCA AGENT MODE</span>
+              <div class="toggle on" id="rcaToggle1" onclick="toggleRCA(1)"></div>
+            </div>
+            <div id="rcaStatus1" class="rca-status">🟢 enabled</div>
+          </div>
+
+          <!-- Part A -->
+          <div class="step-section">
+            <div class="step-label">Part A — External Event</div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="connectFleetPartA()">
+                Simulate Network Outage
+              </button>
+              <button class="btn btn-rca" id="kaiBtn1a" onclick="manualKAI(1,'fb-uc1a')" style="display:none">
+                🤖 Run RCA Agent
+              </button>
+            </div>
+            <div class="step-feedback-area" id="fb-uc1a"></div>
+          </div>
+
+          <!-- Part B -->
+          <div class="step-section">
+            <div class="step-label">Part B — Platform Failure</div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="injectFault('presence-service',1)">
+                Simulate Platform Failure
+              </button>
+              <button class="btn btn-rca" id="kaiBtn1b" onclick="manualKAI(1,'fb-uc1b')" style="display:none">
+                🤖 Run RCA Agent
+              </button>
+            </div>
+            <div class="step-feedback-area" id="fb-uc1b"></div>
+          </div>
+        </div>
+
+        <!-- ══ SCENARIO 2 ══ -->
+        <div class="uc-panel" id="uc2">
+          <span class="uc-title">Log Analysis Fallback</span>
+          <div style="position:relative;display:inline-block;">
+            <i class="fa-solid fa-circle-info info-icon" data-target="pop-2" style="font-size:15px;cursor:pointer;"></i>
+            <div id="pop-2" class="info-popup" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0D1F3C;border:2px solid #4A90D9;border-radius:12px;padding:16px;width:min(700px,90vw);max-height:85vh;z-index:9999;overflow:auto;box-shadow:0 0 40px rgba(0,0,0,0.8);">
+              <img class="zoomable" src="/images/2.png" style="width:100%;height:auto;border-radius:8px;" />
+            </div>
+          </div>
+          <div class="uc-desc">
+            All services appear healthy in the graph, but hidden issues exist in logs.
+            The agent detects failures through log analysis when graph-based RCA is inconclusive.
+          </div>
+
+          <div class="rca-card" style="margin-bottom:14px;">
+            <div class="rca-header">
+              <span class="rca-title">RCA AGENT MODE</span>
+              <div class="toggle on" id="rcaToggle2" onclick="toggleRCA(2)"></div>
+            </div>
+            <div id="rcaStatus2" class="rca-status">🟢 enabled</div>
+          </div>
+
+          <div class="step-section">
+            <div class="step-label">Simulate Failure</div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="injectSilentFault(2)">
+                Simulate Failure
+              </button>
+              <button class="btn btn-rca" id="kaiBtn2" onclick="manualKAI(2,'fb-uc2')" style="display:none">
+                🤖 Run RCA Agent
+              </button>
+            </div>
+            <div class="step-feedback-area" id="fb-uc2"></div>
+            <div style="margin-top:8px;font-size:1.0rem;color:var(--slate);font-family:var(--mono)">
+              Graph remains healthy · errors visible in logs panel
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ SCENARIO 3 ══ -->
+        <div class="uc-panel" id="uc3">
+          <span class="uc-title">Operations History</span>
+          <div style="position:relative;display:inline-block;">
+            <i class="fa-solid fa-circle-info info-icon" data-target="pop-3" style="font-size:15px;cursor:pointer;"></i>
+            <div id="pop-3" class="info-popup" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0D1F3C;border:2px solid #4A90D9;border-radius:12px;padding:16px;width:min(700px,90vw);max-height:85vh;z-index:9999;overflow:auto;box-shadow:0 0 40px rgba(0,0,0,0.8);">
+              <img class="zoomable" src="/images/3.png" style="width:100%;height:auto;border-radius:8px;" />
+            </div>
+          </div>
+          <div class="uc-desc">
+            System leverages historical incident data to accelerate RCA.
+            Instead of full investigation, the agent identifies recurring issues
+            and applies known resolutions with high confidence.
+          </div>
+
+          <div class="rca-card" style="margin-bottom:14px;">
+            <div class="rca-header">
+              <span class="rca-title">RCA AGENT MODE</span>
+              <div class="toggle on" id="rcaToggle3" onclick="toggleRCA(3)"></div>
+            </div>
+            <div id="rcaStatus3" class="rca-status">🟢 enabled</div>
+          </div>
+
+          <!-- Load Incident History -->
+          <div class="step-section">
+            <div class="step-label">Load Incident History</div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="runSeed('tickets-only')">
+                Load Incident History
+              </button>
+            </div>
+            <div class="step-feedback-area" id="fb-uc3-seed"></div>
+          </div>
+
+          <!-- Simulate DB Failure -->
+          <div class="step-section">
+            <div class="step-label">Simulate Failure</div>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="injectDbFault(3)">
+                Simulate Database Failure
+              </button>
+              <button class="btn btn-rca" id="kaiBtn3" onclick="manualKAI(3,'fb-uc3')" style="display:none">
+                🤖 Run RCA Agent
+              </button>
+            </div>
+            <div class="step-feedback-area" id="fb-uc3"></div>
+          </div>
+        </div>
+
+      </div><!-- uc-content -->
+    </div><!-- center-panel -->
+
+    <!-- RIGHT PANEL: LOGS -->
+    <div class="panel">
+      <div class="panel-title">Live Service Logs</div>
+      <div class="log-selector">
+        <select class="log-select" id="logServiceSelect" onchange="fetchLogs()">
+          <option value="diagnostics-service">diagnostics-service</option>
+          <option value="vehicle-telemetry-service">vehicle-telemetry-service</option>
+          <option value="maintenance-service">maintenance-service</option>
+          <option value="notification-service">notification-service</option>
+          <option value="dealer-portal-service">dealer-portal-service</option>
+          <option value="presence-service">presence-service</option>
+          <option value="vsr-service">vsr-service</option>
+          <option value="rlu-service">rlu-service</option>
+          <option value="mnp-service">mnp-service</option>
+          <option value="falkordb">falkordb</option>
+          <option value="mosquitto-broker">mosquitto-broker</option>
+        </select>
+        <button class="btn btn-ghost" style="font-size:1.0rem;padding:5px 8px" onclick="fetchLogs()">↻</button>
+      </div>
+      <div class="log-count" id="logCount">
+        <span>lines: —</span>
+        <span class="err-count" id="errCountDisplay">errors: —</span>
+        <span class="warn-count" id="warnCountDisplay">warnings: —</span>
+      </div>
+      <div class="log-viewer" id="logViewer">
+        <div style="color:var(--slate)">Select a service above to view logs.</div>
+      </div>
+    </div>
+
+  </div><!-- layout -->
+
+  <script>
+    // ─────────────────────────────────────────────────────────────────────────
+    // DISMISS TIMING CONSTANTS
+    // Tweak these to adjust how long a "done" step stays visible before fading.
+    // ─────────────────────────────────────────────────────────────────────────
+    const DONE_LINGER_MS   = 30000;  // time the ✓ stays fully visible (ms)
+    const DISMISS_DELAY_MS = 600;   // CSS transition duration for fade+collapse
+
+    // Tracks per-container whether all steps have resolved (for auto-clear)
+    const _containerDoneTimers = {};
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // STEP FEEDBACK ENGINE
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Render N pending step rows inside a feedback container.
+     */
+    function showSteps(containerId, steps) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+
+      // Cancel any pending dismiss timer for this container
+      if (_containerDoneTimers[containerId]) {
+        clearTimeout(_containerDoneTimers[containerId]);
+        delete _containerDoneTimers[containerId];
+      }
+
+      el.innerHTML = steps.map((s, i) => `
+        <div id="${containerId}-step-${i}" class="step-item">
+          <span class="step-icon" id="${containerId}-icon-${i}">⋯</span>
+          <span>${s.label}</span>
+        </div>
+      `).join('');
+    }
+
+    /**
+     * Update a single step's visual state.
+     * state: 'running' | 'done' | 'error' | 'skip'
+     *
+     * When state === 'done':
+     *   - Shows ✓ briefly, then fades + collapses the row out.
+     *   - Once ALL steps in the container are settled (done/error/skip),
+     *     the container itself clears automatically.
+     */
+    function markStep(containerId, index, state) {
+      const item = document.getElementById(`${containerId}-step-${index}`);
+      const icon = document.getElementById(`${containerId}-icon-${index}`);
+      if (!item || !icon) return;
+
+      item.classList.remove('step-running', 'step-done', 'step-error', 'step-skip');
+
+      if (state === 'running') {
+        item.classList.add('step-running');
+        icon.innerHTML = '<span class="spin">↻</span>';
+
+      } else if (state === 'done') {
+        item.classList.add('step-done');
+        icon.innerHTML = '✓';
+
+        // After linger delay → add dismissing class to start CSS transition
+        setTimeout(() => {
+          item.classList.add('step-dismissing');
+
+          // After transition completes → remove the element from DOM
+          setTimeout(() => {
+            item.remove();
+            _checkContainerEmpty(containerId);
+          }, DISMISS_DELAY_MS);
+
+        }, DONE_LINGER_MS);
+
+      } else if (state === 'error') {
+        item.classList.add('step-error');
+        icon.innerHTML = '✕';
+        // Errors stay visible — operator needs to see them
+
+      } else if (state === 'skip') {
+        item.classList.add('step-skip');
+        icon.innerHTML = '—';
+
+        // Skip rows also auto-dismiss (same timing as done)
+        setTimeout(() => {
+          item.classList.add('step-dismissing');
+          setTimeout(() => {
+            item.remove();
+            _checkContainerEmpty(containerId);
+          }, DISMISS_DELAY_MS);
+        }, DONE_LINGER_MS);
+      }
+    }
+
+    /**
+     * If every step row in a container has been removed (i.e. all done/skip),
+     * clear the container's innerHTML entirely so no ghost space remains.
+     */
+    function _checkContainerEmpty(containerId) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      // If no .step-item children remain, wipe the container
+      if (el.querySelectorAll('.step-item').length === 0) {
+        el.innerHTML = '';
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // STATE
+    // ─────────────────────────────────────────────────────────────────────────
+    let autoRefresh = true;
+    let refreshTimer = null;
+    let logTimer = null;
+    const REFRESH_INTERVAL = 3000;
+    const LOG_REFRESH_INTERVAL = 4000;
+
+    // RCA toggle per scenario (true = auto, false = manual)
+    let autoRCA = { 1: true, 2: true, 3: true };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CORE API HELPER
+    // ─────────────────────────────────────────────────────────────────────────
+    // Relative URL — resolves against the page origin so the same HTML works
+    // for both local Docker (localhost:8090) and cloud deployments without
+    // any rebuild. The other fetches in this file already use relative paths.
+    async function callApi(method, path) {
+      const res = await fetch(path, { method });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RCA TOGGLE
+    // ─────────────────────────────────────────────────────────────────────────
+    function toggleRCA(uc) {
+      autoRCA[uc] = !autoRCA[uc];
+      const toggle  = document.getElementById(`rcaToggle${uc}`);
+      const status  = document.getElementById(`rcaStatus${uc}`);
+      const buttons = document.querySelectorAll(`[id^="kaiBtn${uc}"]`);
+
+      toggle.classList.toggle('on', autoRCA[uc]);
+
+      if (autoRCA[uc]) {
+        status.innerHTML  = '🟢 enabled';
+        status.style.color = 'var(--green)';
+        buttons.forEach(b => b.style.display = 'none');
+      } else {
+        status.innerHTML  = '⚪ disabled — click Run RCA Agent';
+        status.style.color = 'var(--amber)';
+        buttons.forEach(b => b.style.display = 'inline-block');
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MANUAL KAI TRIGGER
+    // ─────────────────────────────────────────────────────────────────────────
+    async function manualKAI(uc, fbId) {
+      showSteps(fbId, [
+        { label: 'RCA Agent triggered — investigating platform...' }
+      ]);
+      markStep(fbId, 0, 'running');
+      try {
+        await callApi('POST', `/api/kai/trigger/${uc}`);
+        markStep(fbId, 0, 'done');
+      } catch (e) {
+        markStep(fbId, 0, 'error');
+        console.error('KAI error:', e);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SCENARIO 1 — PART A: Simulate Network Outage
+    // ─────────────────────────────────────────────────────────────────────────
+    async function connectFleetPartA() {
+      const fbId  = 'fb-uc1a';
+      const rcaOn = autoRCA[1];
+
+      showSteps(fbId, rcaOn ? [
+        { label: 'Simulating network outage — disconnecting vehicles from MQTT...' },
+        { label: 'RCA Agent triggered — analysing dependency graph...' }
+      ] : [
+        { label: 'Simulating network outage — disconnecting vehicles from MQTT...' }
+      ]);
+
+      markStep(fbId, 0, 'running');
+      try {
+        await callApi('POST', '/api/simulate/vehicles/mass_disconnect');
+        markStep(fbId, 0, 'done');
+      } catch (e) {
+        markStep(fbId, 0, 'error');
+        return;
+      }
+
+      if (rcaOn) {
+        markStep(fbId, 1, 'running');
+        try {
+          await callApi('POST', '/api/kai/trigger/1');
+          markStep(fbId, 1, 'done');
+        } catch (e) {
+          markStep(fbId, 1, 'error');
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SCENARIO 1 — PART B: Simulate Platform Failure
+    // ─────────────────────────────────────────────────────────────────────────
+    async function injectFault(service, uc) {
+      const fbId  = 'fb-uc1b';
+      const rcaOn = autoRCA[uc];
+
+      showSteps(fbId, rcaOn ? [
+        { label: 'Simulating network outage — disconnecting vehicles from MQTT...' },
+        { label: `Injecting fault into ${service}...` },
+        { label: 'RCA Agent triggered — analysing platform health...' }
+      ] : [
+        { label: 'Simulating network outage — disconnecting vehicles from MQTT...' },
+        { label: `Injecting fault into ${service}...` }
+      ]);
+
+      markStep(fbId, 0, 'running');
+      try {
+        await callApi('POST', '/api/simulate/vehicles/mass_disconnect');
+        markStep(fbId, 0, 'done');
+      } catch (e) {
+        markStep(fbId, 0, 'error');
+        return;
+      }
+
+      markStep(fbId, 1, 'running');
+      try {
+        await callApi('POST', `/api/fault/inject/${service}?ai_mode=false`);
+        markStep(fbId, 1, 'done');
+      } catch (e) {
+        markStep(fbId, 1, 'error');
+        return;
+      }
+
+      if (rcaOn) {
+        markStep(fbId, 2, 'running');
+        try {
+          await callApi('POST', '/api/kai/trigger/1');
+          markStep(fbId, 2, 'done');
+        } catch (e) {
+          markStep(fbId, 2, 'error');
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SCENARIO 2: Simulate Silent Failure
+    // ─────────────────────────────────────────────────────────────────────────
+    async function injectSilentFault(uc) {
+      const fbId  = `fb-uc${uc}`;
+      const rcaOn = autoRCA[uc];
+
+      showSteps(fbId, rcaOn ? [
+        { label: 'Injecting silent fault — service graph will remain green...' },
+        { label: 'Switching log view to diagnostics-service...' },
+        { label: 'RCA Agent triggered — scanning logs for hidden anomalies...' }
+      ] : [
+        { label: 'Injecting silent fault — service graph will remain green...' },
+        { label: 'Switching log view to diagnostics-service...' }
+      ]);
+
+      markStep(fbId, 0, 'running');
+      try {
+        await callApi('POST', '/api/fault/inject-silent?ai_mode=false');
+        markStep(fbId, 0, 'done');
+      } catch (e) {
+        markStep(fbId, 0, 'error');
+        return;
+      }
+
+      markStep(fbId, 1, 'running');
+      document.getElementById('logServiceSelect').value = 'diagnostics-service';
+      await new Promise(r => setTimeout(r, 800));
+      fetchLogs();
+      markStep(fbId, 1, 'done');
+
+      if (rcaOn) {
+        markStep(fbId, 2, 'running');
+        try {
+          await callApi('POST', `/api/kai/trigger/${uc}`);
+          markStep(fbId, 2, 'done');
+        } catch (e) {
+          markStep(fbId, 2, 'error');
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SCENARIO 3 — Load Incident History
+    // ─────────────────────────────────────────────────────────────────────────
+    async function runSeed(mode) {
+      const fbId = 'fb-uc3-seed';
+      const labelMap = {
+        'full':         'Seeding graph with full dataset...',
+        'no-tickets':   'Seeding graph without ticket history...',
+        'tickets-only': 'Loading historical incident tickets into the graph...'
+      };
+
+      showSteps(fbId, [
+        { label: labelMap[mode] || `Seeding graph (${mode})...` }
+      ]);
+      markStep(fbId, 0, 'running');
+      try {
+        await callApi('POST', `/api/seed/${mode}`);
+        markStep(fbId, 0, 'done');
+      } catch (e) {
+        markStep(fbId, 0, 'error');
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SCENARIO 3 — Simulate Database Failure
+    // ─────────────────────────────────────────────────────────────────────────
+    async function injectDbFault(uc) {
+      const fbId  = `fb-uc${uc}`;
+      const rcaOn = autoRCA[uc];
+
+      showSteps(fbId, rcaOn ? [
+        { label: 'Injecting SQLite DB fault into diagnostics-service...' },
+        { label: 'RCA Agent triggered — cross-referencing incident history...' }
+      ] : [
+        { label: 'Injecting SQLite DB fault into diagnostics-service...' }
+      ]);
+
+      markStep(fbId, 0, 'running');
+      try {
+        await callApi('POST', '/api/fault/inject-db?ai_mode=false');
+        markStep(fbId, 0, 'done');
+      } catch (e) {
+        markStep(fbId, 0, 'error');
+        return;
+      }
+
+      if (rcaOn) {
+        markStep(fbId, 1, 'running');
+        try {
+          await callApi('POST', `/api/kai/trigger/${uc}`);
+          markStep(fbId, 1, 'done');
+        } catch (e) {
+          markStep(fbId, 1, 'error');
+        }
+      }
+
+      setTimeout(refreshAll, 1500);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RESET SYSTEM
+    // ─────────────────────────────────────────────────────────────────────────
+    async function clearAll() {
+      ['fb-uc1a', 'fb-uc1b', 'fb-uc2', 'fb-uc3', 'fb-uc3-seed'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+      });
+
+      const activePanel = document.querySelector('.uc-panel.active');
+      const activeFb = activePanel
+        ? (activePanel.querySelector('.step-feedback-area') || {}).id
+        : 'fb-uc1b';
+      const fbId = activeFb || 'fb-uc1b';
+
+      showSteps(fbId, [
+        { label: 'Resetting the System...' }
+      ]);
+
+      markStep(fbId, 0, 'running');
+      try {
+        await callApi('POST', '/api/fault/clear-all');
+        markStep(fbId, 0, 'done');
+      } catch (e) {
+        markStep(fbId, 0, 'error');
+      }
+
+      setTimeout(refreshAll, 1500);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // TAB SWITCHING
+    // ─────────────────────────────────────────────────────────────────────────
+    function switchTab(n) {
+      document.querySelectorAll('.uc-tab').forEach((t, i) => t.classList.toggle('active', i === n - 1));
+      document.querySelectorAll('.uc-panel').forEach((p, i) => p.classList.toggle('active', i === n - 1));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // REFRESH
+    // ─────────────────────────────────────────────────────────────────────────
+    function startRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(refreshAll, REFRESH_INTERVAL);
+      if (logTimer) clearInterval(logTimer);
+      logTimer = setInterval(fetchLogs, LOG_REFRESH_INTERVAL);
+    }
+
+    function stopRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      if (logTimer) clearInterval(logTimer);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RENDER HEALTH
+    // ─────────────────────────────────────────────────────────────────────────
+    // Display names for service cards. All names use the full kebab-case
+    // API identifier so the dashboard is unambiguous and consistent with
+    // the underlying graph + MCP tool vocabulary. Acronym services include
+    // the acronym in parentheses for readability.
+    const SERVICE_DISPLAY_NAMES = {
+      'presence-service':          'presence-service',
+      'vehicle-telemetry-service': 'vehicle-telemetry-service',
+      'diagnostics-service':       'diagnostics-service',
+      'maintenance-service':       'maintenance-service',
+      'notification-service':      'notification-service',
+      'dealer-portal-service':     'dealer-portal-service',
+      'vsr-service':               'vehicle-status-report (VSR)',
+      'rlu-service':               'remote-lock/unlock (RLU)',
+      'mnp-service':               'messaging-notification-platform (MNP)',
+    };
+
+    // Display order — walks the dependency graph from foundation up:
+    //   presence (broker subscription, :Vehicle graph)
+    //   → telemetry → diagnostics → maintenance → notification → dealer-portal
+    //   → vsr (parallel read path off telemetry)
+    //   → rlu (write/command path)
+    //   → mnp (async broker; optional dependency from notification)
+    // Any unlisted service falls to the end in the order /api/health returned it.
+    const SERVICE_ORDER = [
+      'presence-service',
+      'vehicle-telemetry-service',
+      'diagnostics-service',
+      'maintenance-service',
+      'notification-service',
+      'dealer-portal-service',
+      'vsr-service',
+      'rlu-service',
+      'mnp-service',
+    ];
+
+    function renderHealth(data) {
+      const container = document.getElementById('serviceCards');
+      let healthyCount = 0, totalCount = 0;
+
+      // Sort entries by dependency order. Services not in SERVICE_ORDER keep
+      // their original /api/health order at the tail.
+      const orderIndex = name => {
+        const i = SERVICE_ORDER.indexOf(name);
+        return i === -1 ? SERVICE_ORDER.length : i;
+      };
+      const orderedEntries = Object.entries(data)
+        .sort(([a], [b]) => orderIndex(a) - orderIndex(b));
+
+      container.innerHTML = orderedEntries.map(([name, svc]) => {
+        totalCount++;
+        const st = (svc.status || 'UNKNOWN').toLowerCase();
+        const statusClass = st === 'healthy' ? 'healthy' : st === 'unreachable' ? 'unreachable' : 'unhealthy';
+        if (st === 'healthy') healthyCount++;
+
+        const issues = (svc.issues || []).slice(0, 2)
+          .map(i => `<div class="service-issue">↳ ${i}</div>`).join('');
+
+        let flagsHtml = '';
+        if (svc.service_fault_active) flagsHtml += '<span class="fault-flag active">SERVICE FAULT</span>';
+        if (svc.db_fault_active)      flagsHtml += '<span class="fault-flag active">DB FAULT</span>';
+        if (svc.silent_fault_active)  flagsHtml += '<span class="fault-flag active">SILENT FAULT</span>';
+        if (svc.fault_active)         flagsHtml += '<span class="fault-flag active">FAULT</span>';
+        const flagsSection = flagsHtml ? `<div class="fault-flags">${flagsHtml}</div>` : '';
+
+        const shortName = SERVICE_DISPLAY_NAMES[name] || name;
+        return `
+          <div class="service-card ${statusClass}">
+            <div class="service-header">
+              <div class="service-name">${shortName}</div>
+              <div class="service-status status-${statusClass}">${(svc.status || 'UNKNOWN').toUpperCase()}</div>
+            </div>
+            ${issues}${flagsSection}
+          </div>`;
+      }).join('');
+
+      document.getElementById('svcHealthy').textContent   = healthyCount;
+      document.getElementById('svcUnhealthy').textContent = totalCount - healthyCount;
+
+      const dot = document.getElementById('platformDot');
+      const txt = document.getElementById('platformText');
+      if (healthyCount === totalCount) {
+        dot.className = 'status-dot'; txt.textContent = 'ALL SYSTEMS HEALTHY';
+      } else if (healthyCount >= totalCount * 0.5) {
+        dot.className = 'status-dot degraded'; txt.textContent = 'PLATFORM DEGRADED';
+      } else {
+        dot.className = 'status-dot incident'; txt.textContent = 'INCIDENT ACTIVE';
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RENDER GRAPH
+    // ─────────────────────────────────────────────────────────────────────────
+    function renderGraph(data) {
+      let connected = 0, disconnected = 0;
+
+      // console.log(String(data?.vehicles[0]?.count ?? "").toLowerCase())
+      (data.vehicles || []).forEach(v => {
+        const count = Number(v.count || 0);
+        if ((v.state || '').toLowerCase() === 'connected') connected += count;
+        else disconnected += count;
+      });
+      document.getElementById('vehConnected').textContent    = connected;
+      document.getElementById('vehDisconnected').textContent = disconnected;
+      // console.log(`connected: ${connected}, disconnected: ${disconnected}`); // should be 0, 1000
+
+      const jiraCount = data.jira_count || 0;
+      document.getElementById('jiraOpen').textContent     = jiraCount;
+      document.getElementById('jiraCritical').textContent = 0;
+      updateSeedIndicators(jiraCount);
+
+      const rca        = data.rca_candidates || [];
+      const rcaSection = document.getElementById('rcaSection');
+      if (rcaSection) {
+        if (rca.length > 0) {
+          rcaSection.style.display = 'block';
+          document.getElementById('rcaCandidates').innerHTML = rca.map(r =>
+            `<div class="rca-candidate">⚡ ${r.name} <span style="color:var(--slate)">[${r.type}]</span></div>`
+          ).join('');
+        } else {
+          rcaSection.style.display = 'none';
+        }
+      }
+    }
+
+    function updateSeedIndicators(jiraCount) {
+      const hasTickets = jiraCount > 0;
+      ['2', '3'].forEach(n => {
+        const ind = document.getElementById(`seedIndicator${n}`);
+        const txt = document.getElementById(`seedStateText${n}`);
+        if (ind) ind.className = 'seed-indicator ' + (hasTickets ? 'with-tickets' : 'no-tickets');
+        if (txt) txt.textContent = hasTickets
+          ? `Graph has ${jiraCount} Jira tickets`
+          : 'Graph seeded without Jira history';
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // LOG VIEWER
+    // ─────────────────────────────────────────────────────────────────────────
+    async function fetchLogs() {
+      const service = document.getElementById('logServiceSelect').value;
+      try {
+        const r    = await fetch(`/api/logs/${service}?lines=500`);
+        const data = await r.json();
+        const viewer = document.getElementById('logViewer');
+
+        document.getElementById('logCount').innerHTML = `
+          <span>lines: ${data.total_lines || 0}</span>
+          <span class="err-count">errors: ${data.error_count || 0}</span>
+          <span class="warn-count">warnings: ${data.warning_count || 0}</span>`;
+
+        const lines = data.signal_lines || [];
+        if (!lines.length) {
+          viewer.innerHTML = '<div style="color:var(--slate)">No significant log entries found.</div>';
+          return;
+        }
+        const errorSet = new Set(data.errors   || []);
+        const warnSet  = new Set(data.warnings || []);
+
+        viewer.innerHTML = lines.map(line => {
+          let cls = 'normal';
+          if (errorSet.has(line)) cls = 'error';
+          else if (warnSet.has(line)) cls = 'warning';
+          else if (line.includes('INFO')) cls = 'info';
+          const esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          return `<div class="log-line ${cls}">${esc}</div>`;
+        }).join('');
+
+        viewer.scrollTop = viewer.scrollHeight;
+      } catch (e) {
+        document.getElementById('logViewer').innerHTML =
+          `<div style="color:var(--red-lt)">Error fetching logs: ${e.message}</div>`;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MAIN REFRESH
+    // ─────────────────────────────────────────────────────────────────────────
+    async function refreshAll() {
+      try {
+        const [healthData, graphData] = await Promise.all([
+          fetch('/api/health').then(r => r.json()),
+          fetch('/api/graph').then(r  => r.json()),
+        ]);
+        renderHealth(healthData);
+        renderGraph(graphData);
+        const lu = document.getElementById('lastUpdated');
+        if (lu) lu.textContent = new Date().toLocaleTimeString();
+      } catch (e) {
+        console.warn('Refresh failed:', e);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // INFO POPUPS
+    // ─────────────────────────────────────────────────────────────────────────
+    document.querySelectorAll('.info-icon').forEach(function(icon) {
+      icon.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const popup   = document.getElementById(icon.getAttribute('data-target'));
+        const overlay = document.getElementById('popupOverlay');
+        const isOpen  = popup.style.display === 'block';
+        closeAllPopups();
+        if (!isOpen) {
+          popup.style.display   = 'block';
+          overlay.style.display = 'block';
+        }
+      });
+    });
+
+    function closeAllPopups() {
+      document.querySelectorAll('.info-popup').forEach(p => p.style.display = 'none');
+      const overlay = document.getElementById('popupOverlay');
+      if (overlay) overlay.style.display = 'none';
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // INIT
+    // ─────────────────────────────────────────────────────────────────────────
+    refreshAll();
+    fetchLogs();
+    startRefresh();
+  </script>
+</body>
+</html>
